@@ -4,16 +4,18 @@ const dataFiles = [
     {name: "History", path: "data/history.csv"}
 ];
 
-let loadedData = {}; // { filename: { headers: [], rows: [] } }
+let loadedData = {};        // { filename: { headers: [], rows: [] } }
 let selectedFiles = [];
 let rowMode = "sequential";
-let selectedColumn = "";
 let currentRow = 0;
 let currentCol = 0;
 let allRows = [];
+let selectedColumns = {};   // { filePath: [column1, column2, ...] }
 
 window.addEventListener('DOMContentLoaded', () => {
     const fileOptions = document.getElementById('file-options');
+
+    // Populate topic selection
     dataFiles.forEach(file => {
         const checkbox = document.createElement('input');
         checkbox.type = "checkbox";
@@ -31,181 +33,176 @@ window.addEventListener('DOMContentLoaded', () => {
         fileOptions.appendChild(container);
     });
 
+    // Next to settings screen
     document.getElementById('next-to-settings').addEventListener('click', async () => {
         selectedFiles = Array.from(fileOptions.querySelectorAll('input:checked')).map(cb => cb.value);
-        if(selectedFiles.length === 0) {
-            alert("Select at least one file.");
-            return;
-        }
-
+        if(selectedFiles.length === 0) return alert("Select at least one file.");
         await loadSelectedFiles();
         showSettingsScreen();
     });
 
+    // Start quiz
     document.getElementById('start-quiz').addEventListener('click', () => {
         rowMode = document.querySelector('input[name="rowMode"]:checked').value;
-        selectedColumn = document.getElementById('column-select').value;
+
+        // Gather selected columns per file
+        selectedColumns = {};
+        document.querySelectorAll('#column-settings input[type="checkbox"]').forEach(cb => {
+            const file = cb.dataset.file;
+            if(!selectedColumns[file]) selectedColumns[file] = [];
+            if(cb.checked) selectedColumns[file].push(cb.value);
+        });
+
         prepareQuizRows();
         showQuizScreen();
         displayCell();
     });
 
-    document.getElementById('prev-row').addEventListener('click', () => {
-        currentRow = (currentRow - 1 + allRows.length) % allRows.length;
-        displayCell();
+    // Button navigation
+    document.getElementById('prev-row').addEventListener('click', prevRow);
+    document.getElementById('next-row').addEventListener('click', nextRow);
+    document.getElementById('prev-col').addEventListener('click', prevCol);
+    document.getElementById('next-col').addEventListener('click', nextCol);
+
+    // Keyboard navigation
+    document.addEventListener('keydown', e => {
+        switch(e.key) {
+            case "ArrowLeft": prevCol(); break;
+            case "ArrowRight": nextCol(); break;
+            case "ArrowUp": prevRow(); break;
+            case "ArrowDown": nextRow(); break;
+        }
     });
-    document.getElementById('next-row').addEventListener('click', () => {
-        currentRow = (currentRow + 1) % allRows.length;
-        displayCell();
+
+    // Swipe support
+    let startX = 0, startY = 0;
+    const threshold = 50;
+    const cellDisplayBox = document.getElementById('cell-display');
+
+    cellDisplayBox.addEventListener('touchstart', e => {
+        const touch = e.changedTouches[0];
+        startX = touch.screenX;
+        startY = touch.screenY;
     });
-    document.getElementById('prev-col').addEventListener('click', () => {
-        const headers = allRows[0].headers;
-        currentCol = (currentCol - 1 + headers.length) % headers.length;
-        displayCell();
-    });
-    document.getElementById('next-col').addEventListener('click', () => {
-        const headers = allRows[0].headers;
-        currentCol = (currentCol + 1) % headers.length;
-        displayCell();
+
+    cellDisplayBox.addEventListener('touchend', e => {
+        const touch = e.changedTouches[0];
+        const dx = touch.screenX - startX;
+        const dy = touch.screenY - startY;
+
+        if(Math.abs(dx) > Math.abs(dy)) {
+            if(dx > threshold) prevCol();
+            else if(dx < -threshold) nextCol();
+        } else {
+            if(dy > threshold) prevRow();
+            else if(dy < -threshold) nextRow();
+        }
     });
 });
 
+// Load selected CSV files
 async function loadSelectedFiles() {
     for(const filePath of selectedFiles) {
         const response = await fetch(filePath);
         const text = await response.text();
         const rows = text.trim().split("\n").map(r => r.split(","));
-        loadedData[filePath] = {
-            headers: rows[0],
-            rows: rows.slice(1)
-        };
+        loadedData[filePath] = { headers: rows[0], rows: rows.slice(1) };
     }
 }
 
+// Show column settings
 function showSettingsScreen() {
-    const screenTopic = document.getElementById('topic-screen');
+    document.getElementById('topic-screen').style.display = 'none';
     const screenSettings = document.getElementById('settings-screen');
-    screenTopic.style.display = 'none';
     screenSettings.style.display = 'block';
 
-    const columnSelect = document.getElementById('column-select');
-    columnSelect.innerHTML = "";
-    const allHeaders = new Set();
-    Object.values(loadedData).forEach(file => file.headers.forEach(h => allHeaders.add(h)));
-    allHeaders.forEach(header => {
-        const option = document.createElement('option');
-        option.value = header;
-        option.textContent = header;
-        columnSelect.appendChild(option);
+    const columnSettings = document.getElementById('column-settings');
+    columnSettings.innerHTML = "";
+
+    selectedFiles.forEach(filePath => {
+        const fileData = loadedData[filePath];
+        const container = document.createElement('div');
+        container.style.marginBottom = "10px";
+
+        const title = document.createElement('strong');
+        title.textContent = filePath.split('/').pop();
+        container.appendChild(title);
+
+        fileData.headers.forEach((header, idx) => {
+            const cb = document.createElement('input');
+            cb.type = "checkbox";
+            cb.value = header;
+            cb.checked = idx === 0;
+            cb.dataset.file = filePath;
+
+            const label = document.createElement('label');
+            label.style.marginRight = "10px";
+            label.textContent = header;
+            label.prepend(cb);
+
+            container.appendChild(document.createElement('br'));
+            container.appendChild(label);
+        });
+
+        columnSettings.appendChild(container);
     });
 }
 
+// Prepare rows
 function prepareQuizRows() {
     allRows = [];
-    Object.values(loadedData).forEach(file => {
+    Object.entries(loadedData).forEach(([filePath, file]) => {
         file.rows.forEach(row => {
-            allRows.push({headers: file.headers, row: row});
+            allRows.push({ headers: file.headers, row: row, file: filePath });
         });
     });
-    if(rowMode === "random") {
-        allRows = shuffleArray(allRows);
-    }
+    if(rowMode === "random") allRows = shuffleArray(allRows);
     currentRow = 0;
     currentCol = 0;
 }
 
+// Show quiz screen
 function showQuizScreen() {
     document.getElementById('settings-screen').style.display = 'none';
-    document.getElementById('quiz-screen').style.display = 'block';
+    document.getElementById('quiz-screen').style.display = 'flex';
 }
 
+// Display current cell
 function displayCell() {
     const cellDisplay = document.getElementById('cell-display');
     const currentData = allRows[currentRow];
-    const colIndex = currentData.headers.indexOf(selectedColumn);
-    if(colIndex === -1) currentCol = 0; // fallback
-    cellDisplay.textContent = currentData.row[currentCol];
+    const filePath = currentData.file;
+    const possibleColumns = selectedColumns[filePath] || currentData.headers;
+
+    // Randomly pick one column if multiple
+    const colName = possibleColumns.length === 1
+        ? possibleColumns[0]
+        : possibleColumns[Math.floor(Math.random() * possibleColumns.length)];
+
+    const colIndex = currentData.headers.indexOf(colName);
+    cellDisplay.textContent = currentData.row[colIndex];
+    currentCol = colIndex;
 }
 
-function shuffleArray(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
-    return array;
-}
-
-
-// ... Keep all previous variables and loadSelectedFiles, showSettingsScreen, etc.
-
-function showQuizScreen() {
-    document.getElementById('settings-screen').style.display = 'none';
-    const quizScreen = document.getElementById('quiz-screen');
-    quizScreen.style.display = 'flex';
-    displayCell();
-}
-
-// Display cell content
-function displayCell() {
-    const cellDisplay = document.getElementById('cell-display');
-    const currentData = allRows[currentRow];
-    const colIndex = currentData.headers.indexOf(selectedColumn);
-    const actualCol = colIndex === -1 ? currentCol : colIndex;
-    cellDisplay.textContent = currentData.row[actualCol];
-}
-
-// Swipe/touch handling
-let startX = 0;
-let startY = 0;
-const threshold = 50; // Minimum distance to trigger swipe
-
-const cellDisplayBox = document.getElementById('cell-display');
-
-cellDisplayBox.addEventListener('touchstart', e => {
-    const touch = e.changedTouches[0];
-    startX = touch.screenX;
-    startY = touch.screenY;
-});
-
-cellDisplayBox.addEventListener('touchend', e => {
-    const touch = e.changedTouches[0];
-    const dx = touch.screenX - startX;
-    const dy = touch.screenY - startY;
-
-    if(Math.abs(dx) > Math.abs(dy)) {
-        if(dx > threshold) prevCol();
-        else if(dx < -threshold) nextCol();
-    } else {
-        if(dy > threshold) prevRow();
-        else if(dy < -threshold) nextRow();
-    }
-});
-
+// Navigation functions
 function prevRow() { currentRow = (currentRow - 1 + allRows.length) % allRows.length; displayCell(); }
 function nextRow() { currentRow = (currentRow + 1) % allRows.length; displayCell(); }
 function prevCol() { 
-    const headers = allRows[0].headers; 
+    const headers = allRows[currentRow].headers;
     currentCol = (currentCol - 1 + headers.length) % headers.length; 
     displayCell(); 
 }
 function nextCol() { 
-    const headers = allRows[0].headers; 
+    const headers = allRows[currentRow].headers;
     currentCol = (currentCol + 1) % headers.length; 
     displayCell(); 
 }
 
-// Keyboard navigation for PC
-document.addEventListener('keydown', e => {
-    switch(e.key) {
-        case "ArrowLeft": prevCol(); break;
-        case "ArrowRight": nextCol(); break;
-        case "ArrowUp": prevRow(); break;
-        case "ArrowDown": nextRow(); break;
+// Shuffle helper
+function shuffleArray(array) {
+    for(let i = array.length-1; i>0; i--) {
+        const j = Math.floor(Math.random()*(i+1));
+        [array[i], array[j]] = [array[j], array[i]];
     }
-});
-
-// Also keep button event listeners
-document.getElementById('prev-row').addEventListener('click', prevRow);
-document.getElementById('next-row').addEventListener('click', nextRow);
-document.getElementById('prev-col').addEventListener('click', prevCol);
-document.getElementById('next-col').addEventListener('click', nextCol);
+    return array;
+}
