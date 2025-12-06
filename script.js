@@ -55,7 +55,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
         prepareQuizRows();
         showQuizScreen();
-        displayCell();
+        startOnRandomSelectedColumn();
     });
 
     // Button navigation
@@ -132,7 +132,7 @@ function showSettingsScreen() {
             const cb = document.createElement('input');
             cb.type = "checkbox";
             cb.value = header;
-            cb.checked = idx === 0;
+            cb.checked = idx === 0; // default first column checked
             cb.dataset.file = filePath;
 
             const label = document.createElement('label');
@@ -167,26 +167,31 @@ function showQuizScreen() {
     document.getElementById('quiz-screen').style.display = 'flex';
 }
 
-// Display current cell
-function displayCell() {
-    const cellDisplay = document.getElementById('cell-display');
+// Start on random selected column
+function startOnRandomSelectedColumn() {
     const currentData = allRows[currentRow];
     const filePath = currentData.file;
     const possibleColumns = selectedColumns[filePath] || currentData.headers;
 
-    // Randomly pick one column if multiple
-    const colName = possibleColumns.length === 1
-        ? possibleColumns[0]
-        : possibleColumns[Math.floor(Math.random() * possibleColumns.length)];
+    if(possibleColumns.length === 1) currentCol = currentData.headers.indexOf(possibleColumns[0]);
+    else {
+        const randomColName = possibleColumns[Math.floor(Math.random() * possibleColumns.length)];
+        currentCol = currentData.headers.indexOf(randomColName);
+    }
 
-    const colIndex = currentData.headers.indexOf(colName);
-    cellDisplay.textContent = currentData.row[colIndex];
-    currentCol = colIndex;
+    displayCell();
+}
+
+// Display current cell
+function displayCell() {
+    const cellDisplay = document.getElementById('cell-display');
+    const currentData = allRows[currentRow];
+    cellDisplay.textContent = currentData.row[currentCol];
 }
 
 // Navigation functions
-function prevRow() { currentRow = (currentRow - 1 + allRows.length) % allRows.length; displayCell(); }
-function nextRow() { currentRow = (currentRow + 1) % allRows.length; displayCell(); }
+function prevRow() { currentRow = (currentRow - 1 + allRows.length) % allRows.length; startOnRandomSelectedColumn(); }
+function nextRow() { currentRow = (currentRow + 1) % allRows.length; startOnRandomSelectedColumn(); }
 function prevCol() { 
     const headers = allRows[currentRow].headers;
     currentCol = (currentCol - 1 + headers.length) % headers.length; 
