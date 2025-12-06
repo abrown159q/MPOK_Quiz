@@ -134,3 +134,78 @@ function shuffleArray(array) {
     }
     return array;
 }
+
+
+// ... Keep all previous variables and loadSelectedFiles, showSettingsScreen, etc.
+
+function showQuizScreen() {
+    document.getElementById('settings-screen').style.display = 'none';
+    const quizScreen = document.getElementById('quiz-screen');
+    quizScreen.style.display = 'flex';
+    displayCell();
+}
+
+// Display cell content
+function displayCell() {
+    const cellDisplay = document.getElementById('cell-display');
+    const currentData = allRows[currentRow];
+    const colIndex = currentData.headers.indexOf(selectedColumn);
+    const actualCol = colIndex === -1 ? currentCol : colIndex;
+    cellDisplay.textContent = currentData.row[actualCol];
+}
+
+// Swipe/touch handling
+let startX = 0;
+let startY = 0;
+const threshold = 50; // Minimum distance to trigger swipe
+
+const cellDisplayBox = document.getElementById('cell-display');
+
+cellDisplayBox.addEventListener('touchstart', e => {
+    const touch = e.changedTouches[0];
+    startX = touch.screenX;
+    startY = touch.screenY;
+});
+
+cellDisplayBox.addEventListener('touchend', e => {
+    const touch = e.changedTouches[0];
+    const dx = touch.screenX - startX;
+    const dy = touch.screenY - startY;
+
+    if(Math.abs(dx) > Math.abs(dy)) {
+        if(dx > threshold) prevCol();
+        else if(dx < -threshold) nextCol();
+    } else {
+        if(dy > threshold) prevRow();
+        else if(dy < -threshold) nextRow();
+    }
+});
+
+function prevRow() { currentRow = (currentRow - 1 + allRows.length) % allRows.length; displayCell(); }
+function nextRow() { currentRow = (currentRow + 1) % allRows.length; displayCell(); }
+function prevCol() { 
+    const headers = allRows[0].headers; 
+    currentCol = (currentCol - 1 + headers.length) % headers.length; 
+    displayCell(); 
+}
+function nextCol() { 
+    const headers = allRows[0].headers; 
+    currentCol = (currentCol + 1) % headers.length; 
+    displayCell(); 
+}
+
+// Keyboard navigation for PC
+document.addEventListener('keydown', e => {
+    switch(e.key) {
+        case "ArrowLeft": prevCol(); break;
+        case "ArrowRight": nextCol(); break;
+        case "ArrowUp": prevRow(); break;
+        case "ArrowDown": nextRow(); break;
+    }
+});
+
+// Also keep button event listeners
+document.getElementById('prev-row').addEventListener('click', prevRow);
+document.getElementById('next-row').addEventListener('click', nextRow);
+document.getElementById('prev-col').addEventListener('click', prevCol);
+document.getElementById('next-col').addEventListener('click', nextCol);
