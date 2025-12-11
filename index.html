@@ -7,46 +7,51 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="screen-container">
 
-        <!-- Topic Selection Screen -->
-        <div id="topic-screen" class="screen">
-            <h1>Select Quiz Topics</h1>
-            <div id="file-options"></div>
-            <button id="next-to-settings">Next</button>
-        </div>
+<div id="screen-container">
 
-        <!-- Settings Screen -->
-        <div id="settings-screen" class="screen" style="display:none;">
-            <h1>Quiz Settings</h1>
-            <label>
-                <input type="radio" name="rowMode" value="sequential" checked> Sequential Rows
-            </label>
-            <label>
-                <input type="radio" name="rowMode" value="random"> Random Rows
-            </label>
-
-            <div id="column-settings">
-                <h3>Select Columns</h3>
-                <!-- Dynamic content will be inserted here -->
-            </div>
-
-            <button id="start-quiz">Start Quiz</button>
-        </div>
-
-        <!-- Quiz Screen -->
-        <div id="quiz-screen" class="screen" style="display:none;">
-            <h1>Quiz</h1>
-            <div id="cell-display"></div>
-            <div class="controls">
-                <button id="prev-row">Previous Row</button>
-                <button id="next-row">Next Row</button>
-                <button id="prev-col">Previous Column</button>
-                <button id="next-col">Next Column</button>
-            </div>
-        </div>
-
+    <!-- Topic Selection Screen -->
+    <div id="topic-screen" class="screen">
+        <h1 class="screen-title">Select Quiz Topics</h1>
+        <div id="file-options"></div>
+        <button id="next-to-settings">Next</button>
     </div>
-    <script src="script.js"></script>
+
+    <!-- Settings Screen -->
+    <div id="settings-screen" class="screen" style="display:none;">
+        <h1 class="screen-title">Quiz Settings</h1>
+
+        <label>
+            <input type="radio" name="rowMode" value="random" checked>
+            Random Rows
+        </label>
+        <label>
+            <input type="radio" name="rowMode" value="sequential">
+            Sequential Rows
+        </label>
+
+        <br><br>
+
+        <button id="start-quiz">Start Quiz</button>
+
+        <div id="column-settings"></div>
+    </div>
+
+    <!-- Quiz Screen -->
+    <div id="quiz-screen" class="screen" style="display:none;">
+        <h1 id="quiz-title" class="screen-title">Quiz</h1>
+
+        <div id="cell-display"></div>
+
+        <div class="controls">
+            <button id="prev-row">Previous Row</button>
+            <button id="next-row">Next Row</button>
+            <button id="prev-col">Previous Column</button>
+            <button id="next-col">Next Column</button>
+        </div>
+    </div>
+</div>
+
+<script src="script.js"></script>
 </body>
 </html>

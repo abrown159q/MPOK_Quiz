@@ -6,7 +6,7 @@ const dataFiles = [
 
 let loadedData = {};        // { filename: { headers: [], rows: [] } }
 let selectedFiles = [];
-let rowMode = "sequential";
+let rowMode = "random";
 let currentRow = 0;
 let currentCol = 0;
 let allRows = [];
