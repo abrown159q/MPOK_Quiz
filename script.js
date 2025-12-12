@@ -11,11 +11,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     loadSavedDisplayNames();
     renderFileOptions();
 
+    document.body.style.overflow = "hidden";
+
     document.getElementById("next-to-settings")
         .addEventListener("click", showSettingsScreen);
 
     document.getElementById("start-quiz")
         .addEventListener("click", startQuiz);
+
+    document.getElementById("fullscreen-btn")
+        .addEventListener("click", enterFullscreen);
 });
 
 async function loadManifest() {
@@ -23,7 +28,6 @@ async function loadManifest() {
     fileList = await res.json();
 }
 
-// Load stored custom display names
 function loadSavedDisplayNames() {
     const stored = localStorage.getItem("displayNames");
     if (stored) userDisplayNames = JSON.parse(stored);
@@ -80,6 +84,8 @@ function renderColumnSelection() {
     const container = document.getElementById("column-settings");
     container.innerHTML = "";
 
+    datasets = [];
+
     selectedFiles.forEach(async file => {
         const data = await loadCSV("data/" + file);
         datasets.push({ file, data });
@@ -93,7 +99,6 @@ function renderColumnSelection() {
         box.innerHTML = `<h3>${userDisplayNames[file] || file}</h3>`;
 
         headers.forEach(col => {
-            const id = `${file}-${col}`;
             const row = document.createElement("div");
 
             row.innerHTML = `
@@ -150,6 +155,8 @@ function startQuiz() {
     document.getElementById("prev-col").onclick = () => changeColumn(-1);
     document.getElementById("next-col").onclick = () => changeColumn(1);
 
+    enableSwipeControls();
+
     pickNewRandomRow();
     updateDisplay();
 }
@@ -175,7 +182,6 @@ function updateDisplay() {
     const col = headers[currentColumnIndex];
 
     document.getElementById("cell-display").textContent = row[col];
-
     document.getElementById("quiz-title").textContent =
         userDisplayNames[ds.file] || ds.file;
 }
@@ -196,4 +202,48 @@ function changeColumn(delta) {
         (currentColumnIndex + delta + headers.length) % headers.length;
 
     updateDisplay();
+}
+
+/* ---------------- Fullscreen Mode ---------------- */
+
+function enterFullscreen() {
+    const elem = document.documentElement;
+
+    if (elem.requestFullscreen) elem.requestFullscreen();
+    else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+    else if (elem.msRequestFullscreen) elem.msRequestFullscreen();
+}
+
+/* ---------------- Swipe Gesture Logic ---------------- */
+
+let touchStartX = 0;
+let touchStartY = 0;
+
+function enableSwipeControls() {
+    const box = document.getElementById("cell-display");
+
+    box.addEventListener("touchstart", e => {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+    });
+
+    box.addEventListener("touchmove", e => {
+        e.preventDefault();  // stops vertical page scroll
+    }, { passive: false });
+
+    box.addEventListener("touchend", e => {
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = e.changedTouches[0].clientY - touchStartY;
+
+        const absX = Math.abs(dx);
+        const absY = Math.abs(dy);
+
+        if (absX > absY && absX > 30) {
+            if (dx < 0) changeColumn(1);
+            else changeColumn(-1);
+        } else if (absY > absX && absY > 30) {
+            if (dy < 0) changeRow(1);
+            else changeRow(-1);
+        }
+    });
 }

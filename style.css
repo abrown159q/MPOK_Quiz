@@ -1,9 +1,9 @@
-/* Fullscreen layout */
 html, body {
     margin: 0;
     padding: 0;
     height: 100%;
     width: 100%;
+    overflow: hidden; /* keeps layout clean */
     font-family: sans-serif;
 }
 
@@ -15,7 +15,6 @@ html, body {
     width: 100%;
 }
 
-/* Title bar: 5% height */
 .screen-title {
     height: 5vh;
     line-height: 5vh;
@@ -24,7 +23,12 @@ html, body {
     text-align: center;
 }
 
-/* Quiz display box: 75% height */
+#fullscreen-btn {
+    margin-top: 5px;
+    font-size: 2vh;
+    padding: 5px 15px;
+}
+
 #cell-display {
     height: 75vh;
     width: 100%;
@@ -32,15 +36,15 @@ html, body {
     display: flex;
     justify-content: center;
     align-items: center;
-    overflow-wrap: anywhere;
+    overflow: hidden; /* prevents scroll */
     padding: 20px;
-    box-sizing: border-box;
     background: #f4f4f4;
     border-top: 2px solid #aaa;
     border-bottom: 2px solid #aaa;
+    box-sizing: border-box;
+    touch-action: none; /* required for swipe detection */
 }
 
-/* Controls: 10% height */
 .controls {
     height: 10vh;
     width: 100%;
@@ -56,7 +60,6 @@ html, body {
     border-radius: 10px;
 }
 
-/* Buttons on setup screens */
 #topic-screen button,
 #settings-screen button {
     margin-top: 20px;
