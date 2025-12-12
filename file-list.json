@@ -1,0 +1,18 @@
+[
+    {
+        "filename": "history.csv",
+        "displayName": "History"
+    },
+    {
+        "filename": "math.csv",
+        "displayName": "Math"
+    },
+    {
+        "filename": "papers_read.csv",
+        "displayName": "Papers_Read"
+    },
+    {
+        "filename": "science.csv",
+        "displayName": "Science"
+    }
+]
