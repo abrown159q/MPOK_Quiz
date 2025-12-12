@@ -1,214 +1,199 @@
-const dataFiles = [
-    {name: "Math", path: "data/math.csv"},
-    {name: "Science", path: "data/science.csv"},
-    {name: "History", path: "data/history.csv"},
-    {name: "Papers", path: "data/papers_read.csv"}
-];
+let fileList = [];
+let userDisplayNames = {};
 
-let loadedData = {};        // { filename: { headers: [], rows: [] } }
+let datasets = [];
 let selectedFiles = [];
+let selectedColumns = {};
 let rowMode = "random";
-let currentRow = 0;
-let currentCol = 0;
-let allRows = [];
-let selectedColumns = {};   // { filePath: [column1, column2, ...] }
 
-window.addEventListener('DOMContentLoaded', () => {
-    const fileOptions = document.getElementById('file-options');
+document.addEventListener("DOMContentLoaded", async () => {
+    await loadManifest();
+    loadSavedDisplayNames();
+    renderFileOptions();
 
-    // Populate topic selection
-    dataFiles.forEach(file => {
-        const checkbox = document.createElement('input');
-        checkbox.type = "checkbox";
-        checkbox.value = file.path;
-        checkbox.id = file.name;
+    document.getElementById("next-to-settings")
+        .addEventListener("click", showSettingsScreen);
 
-        const label = document.createElement('label');
-        label.htmlFor = file.name;
-        label.textContent = file.name;
-
-        const container = document.createElement('div');
-        container.appendChild(checkbox);
-        container.appendChild(label);
-
-        fileOptions.appendChild(container);
-    });
-
-    // Next to settings screen
-    document.getElementById('next-to-settings').addEventListener('click', async () => {
-        selectedFiles = Array.from(fileOptions.querySelectorAll('input:checked')).map(cb => cb.value);
-        if(selectedFiles.length === 0) return alert("Select at least one file.");
-        await loadSelectedFiles();
-        showSettingsScreen();
-    });
-
-    // Start quiz
-    document.getElementById('start-quiz').addEventListener('click', () => {
-        rowMode = document.querySelector('input[name="rowMode"]:checked').value;
-
-        // Gather selected columns per file
-        selectedColumns = {};
-        document.querySelectorAll('#column-settings input[type="checkbox"]').forEach(cb => {
-            const file = cb.dataset.file;
-            if(!selectedColumns[file]) selectedColumns[file] = [];
-            if(cb.checked) selectedColumns[file].push(cb.value);
-        });
-
-        prepareQuizRows();
-        showQuizScreen();
-        startOnRandomSelectedColumn();
-    });
-
-    // Button navigation
-    document.getElementById('prev-row').addEventListener('click', prevRow);
-    document.getElementById('next-row').addEventListener('click', nextRow);
-    document.getElementById('prev-col').addEventListener('click', prevCol);
-    document.getElementById('next-col').addEventListener('click', nextCol);
-
-    // Keyboard navigation
-    document.addEventListener('keydown', e => {
-        switch(e.key) {
-            case "ArrowLeft": prevCol(); break;
-            case "ArrowRight": nextCol(); break;
-            case "ArrowUp": prevRow(); break;
-            case "ArrowDown": nextRow(); break;
-        }
-    });
-
-    // Swipe support
-    let startX = 0, startY = 0;
-    const threshold = 50;
-    const cellDisplayBox = document.getElementById('cell-display');
-
-    cellDisplayBox.addEventListener('touchstart', e => {
-        const touch = e.changedTouches[0];
-        startX = touch.screenX;
-        startY = touch.screenY;
-    });
-
-    cellDisplayBox.addEventListener('touchend', e => {
-        const touch = e.changedTouches[0];
-        const dx = touch.screenX - startX;
-        const dy = touch.screenY - startY;
-
-        if(Math.abs(dx) > Math.abs(dy)) {
-            if(dx > threshold) prevCol();
-            else if(dx < -threshold) nextCol();
-        } else {
-            if(dy > threshold) prevRow();
-            else if(dy < -threshold) nextRow();
-        }
-    });
+    document.getElementById("start-quiz")
+        .addEventListener("click", startQuiz);
 });
 
-// Load selected CSV files
-async function loadSelectedFiles() {
-    for(const filePath of selectedFiles) {
-        const response = await fetch(filePath);
-        const text = await response.text();
-        const rows = text.trim().split("\n").map(r => r.split(","));
-        loadedData[filePath] = { headers: rows[0], rows: rows.slice(1) };
-    }
+async function loadManifest() {
+    const res = await fetch("file-list.json");
+    fileList = await res.json();
 }
 
-// Show column settings
+// Load stored custom display names
+function loadSavedDisplayNames() {
+    const stored = localStorage.getItem("displayNames");
+    if (stored) userDisplayNames = JSON.parse(stored);
+}
+
+function saveDisplayNames() {
+    localStorage.setItem("displayNames", JSON.stringify(userDisplayNames));
+}
+
+function renderFileOptions() {
+    const container = document.getElementById("file-options");
+    container.innerHTML = "";
+
+    fileList.forEach(file => {
+        const displayName = userDisplayNames[file.filename] || file.displayName;
+
+        const row = document.createElement("div");
+        row.className = "file-row";
+
+        row.innerHTML = `
+            <label>
+                <input type="checkbox" value="${file.filename}">
+                <strong>${displayName}</strong>
+            </label>
+            <input type="text" class="rename-box" data-file="${file.filename}" value="${displayName}">
+        `;
+
+        container.appendChild(row);
+    });
+
+    document.querySelectorAll(".rename-box").forEach(input => {
+        input.addEventListener("change", () => {
+            const fname = input.dataset.file;
+            userDisplayNames[fname] = input.value;
+            saveDisplayNames();
+            renderFileOptions();
+        });
+    });
+}
+
 function showSettingsScreen() {
-    document.getElementById('topic-screen').style.display = 'none';
-    const screenSettings = document.getElementById('settings-screen');
-    screenSettings.style.display = 'block';
+    selectedFiles = [...document.querySelectorAll("#file-options input[type=checkbox]:checked")]
+                    .map(x => x.value);
 
-    const columnSettings = document.getElementById('column-settings');
-    columnSettings.innerHTML = "";
+    if (selectedFiles.length === 0) return;
 
-    selectedFiles.forEach(filePath => {
-        const fileData = loadedData[filePath];
-        const container = document.createElement('div');
-        container.style.marginBottom = "10px";
+    document.getElementById("topic-screen").style.display = "none";
+    document.getElementById("settings-screen").style.display = "flex";
 
-        const title = document.createElement('strong');
-        title.textContent = filePath.split('/').pop();
-        container.appendChild(title);
+    renderColumnSelection();
+}
 
-        fileData.headers.forEach((header, idx) => {
-            const cb = document.createElement('input');
-            cb.type = "checkbox";
-            cb.value = header;
-            cb.checked = idx === 0; // default first column checked
-            cb.dataset.file = filePath;
+function renderColumnSelection() {
+    const container = document.getElementById("column-settings");
+    container.innerHTML = "";
 
-            const label = document.createElement('label');
-            label.style.marginRight = "10px";
-            label.textContent = header;
-            label.prepend(cb);
+    selectedFiles.forEach(async file => {
+        const data = await loadCSV("data/" + file);
+        datasets.push({ file, data });
 
-            container.appendChild(document.createElement('br'));
-            container.appendChild(label);
+        const box = document.createElement("div");
+        box.className = "column-box";
+
+        const headers = Object.keys(data[0]);
+        selectedColumns[file] = [headers[0]];
+
+        box.innerHTML = `<h3>${userDisplayNames[file] || file}</h3>`;
+
+        headers.forEach(col => {
+            const id = `${file}-${col}`;
+            const row = document.createElement("div");
+
+            row.innerHTML = `
+                <label>
+                    <input type="checkbox" data-file="${file}" value="${col}" ${col === headers[0] ? "checked" : ""}>
+                    ${col}
+                </label>
+            `;
+
+            box.appendChild(row);
         });
 
-        columnSettings.appendChild(container);
+        container.appendChild(box);
+    });
+
+    container.addEventListener("change", evt => {
+        if (!evt.target.matches("input[type=checkbox]")) return;
+
+        const file = evt.target.dataset.file;
+        const col = evt.target.value;
+
+        if (evt.target.checked) {
+            if (!selectedColumns[file].includes(col))
+                selectedColumns[file].push(col);
+        } else {
+            selectedColumns[file] = selectedColumns[file].filter(c => c !== col);
+        }
     });
 }
 
-// Prepare rows
-function prepareQuizRows() {
-    allRows = [];
-    Object.entries(loadedData).forEach(([filePath, file]) => {
-        file.rows.forEach(row => {
-            allRows.push({ headers: file.headers, row: row, file: filePath });
-        });
+async function loadCSV(url) {
+    const res = await fetch(url);
+    const text = await res.text();
+    const rows = text.split(/\r?\n/).map(r => r.split(","));
+    const headers = rows[0];
+
+    return rows.slice(1).map(row => {
+        const obj = {};
+        headers.forEach((h, i) => obj[h] = row[i] || "");
+        return obj;
     });
-    if(rowMode === "random") allRows = shuffleArray(allRows);
-    currentRow = 0;
-    currentCol = 0;
 }
 
-// Show quiz screen
-function showQuizScreen() {
-    document.getElementById('settings-screen').style.display = 'none';
-    document.getElementById('quiz-screen').style.display = 'flex';
+let currentDatasetIndex = 0;
+let currentRowIndex = 0;
+let currentColumnIndex = 0;
+
+function startQuiz() {
+    document.getElementById("settings-screen").style.display = "none";
+    document.getElementById("quiz-screen").style.display = "flex";
+
+    document.getElementById("prev-row").onclick = () => changeRow(-1);
+    document.getElementById("next-row").onclick = () => changeRow(1);
+    document.getElementById("prev-col").onclick = () => changeColumn(-1);
+    document.getElementById("next-col").onclick = () => changeColumn(1);
+
+    pickNewRandomRow();
+    updateDisplay();
 }
 
-// Start on random selected column
-function startOnRandomSelectedColumn() {
-    const currentData = allRows[currentRow];
-    const filePath = currentData.file;
-    const possibleColumns = selectedColumns[filePath] || currentData.headers;
+function pickNewRandomRow() {
+    const idx = Math.floor(Math.random() * datasets.length);
+    currentDatasetIndex = idx;
 
-    if(possibleColumns.length === 1) currentCol = currentData.headers.indexOf(possibleColumns[0]);
-    else {
-        const randomColName = possibleColumns[Math.floor(Math.random() * possibleColumns.length)];
-        currentCol = currentData.headers.indexOf(randomColName);
-    }
+    const ds = datasets[idx];
+    currentRowIndex = Math.floor(Math.random() * ds.data.length);
 
-    displayCell();
+    const selectableCols = selectedColumns[ds.file];
+    const col = selectableCols[Math.floor(Math.random() * selectableCols.length)];
+
+    const headers = Object.keys(ds.data[0]);
+    currentColumnIndex = headers.indexOf(col);
 }
 
-// Display current cell
-function displayCell() {
-    const cellDisplay = document.getElementById('cell-display');
-    const currentData = allRows[currentRow];
-    cellDisplay.textContent = currentData.row[currentCol];
+function updateDisplay() {
+    const ds = datasets[currentDatasetIndex];
+    const row = ds.data[currentRowIndex];
+    const headers = Object.keys(row);
+    const col = headers[currentColumnIndex];
+
+    document.getElementById("cell-display").textContent = row[col];
+
+    document.getElementById("quiz-title").textContent =
+        userDisplayNames[ds.file] || ds.file;
 }
 
-// Navigation functions
-function prevRow() { currentRow = (currentRow - 1 + allRows.length) % allRows.length; startOnRandomSelectedColumn(); }
-function nextRow() { currentRow = (currentRow + 1) % allRows.length; startOnRandomSelectedColumn(); }
-function prevCol() { 
-    const headers = allRows[currentRow].headers;
-    currentCol = (currentCol - 1 + headers.length) % headers.length; 
-    displayCell(); 
-}
-function nextCol() { 
-    const headers = allRows[currentRow].headers;
-    currentCol = (currentCol + 1) % headers.length; 
-    displayCell(); 
+function changeRow(delta) {
+    const ds = datasets[currentDatasetIndex];
+    const len = ds.data.length;
+
+    currentRowIndex = (currentRowIndex + delta + len) % len;
+    updateDisplay();
 }
 
-// Shuffle helper
-function shuffleArray(array) {
-    for(let i = array.length-1; i>0; i--) {
-        const j = Math.floor(Math.random()*(i+1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
-    return array;
+function changeColumn(delta) {
+    const ds = datasets[currentDatasetIndex];
+    const headers = Object.keys(ds.data[0]);
+
+    currentColumnIndex =
+        (currentColumnIndex + delta + headers.length) % headers.length;
+
+    updateDisplay();
 }
