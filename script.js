@@ -1,7 +1,8 @@
 const dataFiles = [
     {name: "Math", path: "data/math.csv"},
     {name: "Science", path: "data/science.csv"},
-    {name: "History", path: "data/history.csv"}
+    {name: "History", path: "data/history.csv"},
+    {name: "Papers", path: "data/papers_read.csv"}
 ];
 
 let loadedData = {};        // { filename: { headers: [], rows: [] } }
